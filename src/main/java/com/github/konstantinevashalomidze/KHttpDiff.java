@@ -13,6 +13,12 @@ import java.util.concurrent.CompletableFuture;
 
 public class KHttpDiff {
 
+    private static final String ANSI_RESET = "\u001b[0m";
+    private static final String ANSI_COLOR_START = "\u001b[3"; // 3 is for foreground color
+    private static final String ANSI_COLOR_END = "m";
+
+    private boolean mono = false;
+
     public static void main(String[] args) {
         System.out.println("khttpdiff starting...");
         new KHttpDiff().run(args);
@@ -95,12 +101,41 @@ public class KHttpDiff {
             System.out.println("Responses are identical");
         } else {
             System.out.println("Responses are different");
-            System.out.println("Response 1: " + result1);
-            System.out.println("Response 2: " + result2);
+            System.out.println("    " + colorize(AnsiColor.RED, result1));
+            System.out.println("    " + colorize(AnsiColor.GREEN, result2));
         }
 
         return isSame;
     }
 
+    private String colorize(AnsiColor color, String text) {
+        if (mono) {                     // color code
+            return String.format("%s: %s", color.getCode(), text);
+        }
+
+        String colorCode = ANSI_COLOR_START + color.getCode() + ANSI_COLOR_END;
+
+        return String.format("%s%s%s", colorCode, text, ANSI_RESET);
+    }
+
+    enum AnsiColor {
+        RED(1),
+        GREEN(2),
+        YELLOW(3),
+        BLUE(4),
+        MAGENTA(5),
+        CYAN(6),
+        WHITE(7);
+
+        private final int code;
+
+        AnsiColor(int code) {
+            this.code = code;
+        }
+
+        public String getCode() {
+            return String.valueOf(code);
+        }
+    }
 
 }
