@@ -1,9 +1,14 @@
 package com.github.konstantinevashalomidze;
 
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.security.SecureRandom;
+import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -43,15 +48,15 @@ public class KHttpDiff {
         System.out.println(colorize(AnsiColor.YELLOW, "Comparing ") +
                 colorize(AnsiColor.MAGENTA, method) +
                 colorize(AnsiColor.YELLOW, " requests:"));
-        System.out.println("    " + colorize(AnsiColor.RED, urls.get(0)));
-        System.out.println("    " + colorize(AnsiColor.GREEN, urls.get(1)));
+        System.out.println("    " + colorize(AnsiColor.RED, urls.getFirst()));
+        System.out.println("    " + colorize(AnsiColor.GREEN, urls.getLast()));
         System.out.println();
 
         System.out.println(colorize(AnsiColor.YELLOW, "Making requests..."));
         System.out.println();
 
-        CompletableFuture<HttpResponse<String>> future1 = makeHttpRequestAsync(urls.get(0));
-        CompletableFuture<HttpResponse<String>> future2 = makeHttpRequestAsync(urls.get(1));
+        CompletableFuture<HttpResponse<String>> future1 = makeHttpRequestAsync(method, urls.get(0), body, headers);
+        CompletableFuture<HttpResponse<String>> future2 = makeHttpRequestAsync(method, urls.get(1), body, headers);
 
 
         try {
@@ -68,7 +73,7 @@ public class KHttpDiff {
             boolean hasSameBodies = compareBodies(result1, result2);
 
         } catch (Exception e) {
-            System.err.println("Error getting results: " + e.getMessage());
+            System.out.println(colorize(AnsiColor.YELLOW, "Error getting results " + e.getMessage()));
         }
     }
 
@@ -88,13 +93,43 @@ public class KHttpDiff {
 
     }
 
+    private HttpClient createHttpClient(boolean insecure) {
+        HttpClient.Builder builder = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(10));
+
+        if (insecure) {
+            try {
+                // Trust manager that doesn't validate certificate chains
+                TrustManager[] trustAllCerts = new TrustManager[] {
+                        new X509TrustManager() {
+                            public X509Certificate[] getAcceptedIssuers() {
+                                return null;
+                            }
+                            public void checkClientTrusted(X509Certificate[] certs, String authType) {
+                            }
+                            public void checkServerTrusted(X509Certificate[] certs, String authType) {
+                            }
+                        }
+                };
+
+                // Install the all-trusting trust manager
+                SSLContext sslContext = SSLContext.getInstance("TLS");
+                sslContext.init(null, trustAllCerts, new SecureRandom());
+                builder.sslContext(sslContext);
+            } catch (Exception e) {
+                System.out.println(colorize(AnsiColor.YELLOW, "Warning: Couldn't setup insecure SSL: " + e.getMessage()));
+            }
+        }
+
+        return builder.build();
+    }
+
     private CompletableFuture<HttpResponse<String>> makeHttpRequestAsync(
+            String host, String userAgent, boolean insecure,
             String method, String url, String body, Map<String, String> headers
             ) {
         return CompletableFuture.supplyAsync(() -> {
-            try (HttpClient client = HttpClient.newBuilder()
-                    .connectTimeout(Duration.ofSeconds(10))
-                    .build()) {
+            try (HttpClient client = createHttpClient(insecure)) {
 
 
 
@@ -109,9 +144,20 @@ public class KHttpDiff {
                     requestBuilder.method(method, HttpRequest.BodyPublishers.noBody());
                 }
 
+                // Can be overridden by headers
+                if (host != null && !host.isEmpty()) {
+                    requestBuilder.header("Host", host);
+                }
+
+                if (userAgent != null && !userAgent.isEmpty()) {
+                    requestBuilder.header("User-Agent", userAgent);
+                }
+
+
                 for (var entry : headers.entrySet()) {
                     requestBuilder.header(entry.getKey(), entry.getValue());
                 }
+
 
                 HttpRequest request = requestBuilder.build();
 
