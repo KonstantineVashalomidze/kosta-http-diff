@@ -51,11 +51,14 @@ public class KHttpDiff {
 
 
         try {
-            System.out.println("Response 1: " + future1.get());
-            System.out.println("Response 2: " + future2.get());
+
+            String result1 = future1.get();
+            String result2 = future2.get();
+
+            boolean isSame = compareResponses(result1, result2);
+
         } catch (Exception e) {
             System.err.println("Error getting results: " + e.getMessage());
-            System.exit(2);
         }
 
 
@@ -86,7 +89,18 @@ public class KHttpDiff {
         });
     }
 
+    private boolean compareResponses(String result1, String result2) {
+        boolean isSame = result1.equals(result2);
+        if (isSame) {
+            System.out.println("Responses are identical");
+        } else {
+            System.out.println("Responses are different");
+            System.out.println("Response 1: " + result1);
+            System.out.println("Response 2: " + result2);
+        }
 
+        return isSame;
+    }
 
 
 }
