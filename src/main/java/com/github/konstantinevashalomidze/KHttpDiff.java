@@ -67,12 +67,9 @@ public class KHttpDiff {
             boolean hasSameHeaders = compareHeaders(result1, result2, excludeHeaders);
             boolean hasSameBodies = compareBodies(result1, result2);
 
-
         } catch (Exception e) {
             System.err.println("Error getting results: " + e.getMessage());
         }
-
-
     }
 
     private Set<String> parseExcludeHeaders(String ignore) {
@@ -91,16 +88,32 @@ public class KHttpDiff {
 
     }
 
-    private CompletableFuture<HttpResponse<String>> makeHttpRequestAsync(String url) {
+    private CompletableFuture<HttpResponse<String>> makeHttpRequestAsync(
+            String method, String url, String body, Map<String, String> headers
+            ) {
         return CompletableFuture.supplyAsync(() -> {
             try (HttpClient client = HttpClient.newBuilder()
                     .connectTimeout(Duration.ofSeconds(10))
                     .build()) {
 
-                HttpRequest request = HttpRequest.newBuilder()
-                        .uri(URI.create(url))
-                        .GET()
-                        .build();
+
+
+
+                HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
+                        .uri(URI.create(url));
+
+
+                if (method.equals("POST") || method.equals("PUT")) {
+                    requestBuilder.method(method, HttpRequest.BodyPublishers.ofString(body));
+                } else {
+                    requestBuilder.method(method, HttpRequest.BodyPublishers.noBody());
+                }
+
+                for (var entry : headers.entrySet()) {
+                    requestBuilder.header(entry.getKey(), entry.getValue());
+                }
+
+                HttpRequest request = requestBuilder.build();
 
                 return client.send(
                         request,
@@ -116,7 +129,7 @@ public class KHttpDiff {
     }
 
     private String colorize(AnsiColor color, String text) {
-        if (mono) {                     // color code
+        if (mono) {                       // color code
             return String.format("%s: %s", color.getCode(), text);
         }
 
