@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 public class KHttpDiff {
 
@@ -45,38 +46,47 @@ public class KHttpDiff {
 
         System.out.println("Making requests...");
 
-        String result1 = makeHttpRequest(urls.get(0));
-        String result2 = makeHttpRequest(urls.get(1));
-
-        System.out.println("Response 1: " + result1);
-        System.out.println("Response 2: " + result2);
-
-    }
+        CompletableFuture<String> future1 = makeHttpRequestAsync(urls.get(0));
+        CompletableFuture<String> future2 = makeHttpRequestAsync(urls.get(1));
 
 
-
-    private String makeHttpRequest(String url) {
         try {
-            HttpClient client = HttpClient.newBuilder()
-                    .connectTimeout(Duration.ofSeconds(10))
-                    .build();
-
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .GET()
-                    .build();
-
-            HttpResponse<String> response = client.send(
-                    request,
-                    HttpResponse.BodyHandlers.ofString()
-            );
-
-            return String.format("Status: %d\nBody length: %d", response.statusCode(), response.body().length());
-
+            System.out.println("Response 1: " + future1.get());
+            System.out.println("Response 2: " + future2.get());
         } catch (Exception e) {
-            return "Error: " + e.getMessage();
+            System.err.println("Error getting results: " + e.getMessage());
+            System.exit(2);
         }
+
+
     }
+
+    private CompletableFuture<String> makeHttpRequestAsync(String url) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                HttpClient client = HttpClient.newBuilder()
+                        .connectTimeout(Duration.ofSeconds(10))
+                        .build();
+
+                HttpRequest request = HttpRequest.newBuilder()
+                        .uri(URI.create(url))
+                        .GET()
+                        .build();
+
+                HttpResponse<String> response = client.send(
+                        request,
+                        HttpResponse.BodyHandlers.ofString()
+                );
+
+                return String.format("Status: %d\nBody length: %d", response.statusCode(), response.body().length());
+
+            } catch (Exception e) {
+                return "Error: " + e.getMessage();
+            }
+        });
+    }
+
+
 
 
 }
